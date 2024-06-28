@@ -1,0 +1,39 @@
+name: Tag Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+jobs:
+  tag-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: msg
+        run: |
+          echo "commit_message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
+
+      - if: "!startsWith(steps.msg.outputs.commit_message, 'release v')"
+        run: |
+          echo "'${{ steps.msg.outputs.commit_message }}' did not match expected pattern."
+          exit 1
+
+      - id: msg_version
+        run: |
+          echo "Parsing '${{ steps.msg.outputs.commit_message }}' for version"
+          VERSION=$(echo "${{ steps.msg.outputs.commit_message }}" | sed -E 's/release v(.*)/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - uses: peter-murray/semver-action@v1
+        id: semver
+        with:
+          version: ${{ steps.msg_version.outputs.version }}
+
+      - uses: mathieudutour/github-tag-action@v6.2
+        with:
+          custom_tag: ${{ steps.semver.outputs.semver }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,40 @@
+name: Sync project bundles to specific repositories
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  push:
+    strategy:
+      matrix:
+        bundle: [core, example]
+    runs-on: ubuntu-latest
+    name: "Pushing changes for ${{ matrix.bundle }}"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: local
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/sportradar-unified-odds-java-sdk-${{ matrix.bundle }}
+          ref: master
+          path: remote
+          token: ${{ secrets.PAT_MIRROR }}
+
+      - name: Sync files
+        run: |
+          find remote/ -mindepth 1 -not -path 'remote/.git*' -delete
+          cp -rp local/sdk-${{ matrix.bundle }}/. remote/
+          find local/ -maxdepth 1 -type f -exec cp {} remote/ \;
+
+      - uses: EndBug/add-and-commit@v9
+        with:
+          cwd: remote/
+          default_author: github_actions
+          fetch: false
+          push: true
+          tag: '${{ github.ref_name }} --force'
+          tag_push: '--force'
+          message: 'Update from ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}'
